@@ -1,0 +1,36 @@
+services:
+  backend:
+    build:
+      context: ./../backend
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - 8000:8000
+    volumes:
+      # Mount Savefiles directory to persist simulation results
+      - ./../backend/backend/Savefiles:/app/backend/Savefiles
+    environment:
+      ENVIRONMENT: production
+      TERMINAL_LOGGING_LEVEL: TRACE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docker-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+
+  dashboard:
+    build:
+      context: ./../dashboard
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_URL: 'http://backend:3000'
+    ports:
+      - 3000:3000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # TODO: ADD STUDENTTASK SERVICE
+
