@@ -126,6 +126,12 @@ class StudentTask:
         else:
             use_safety_limits = False
 
+        if task_nr == 3:
+            spreading_control = True
+            logger.info("Spreading control active")
+        else:
+            spreading_control = False
+
         upper_safety = simulator.upper_voltage_safety
         lower_safety = simulator.lower_voltage_safety
         # TODO: make safety limits configurable
@@ -152,8 +158,20 @@ class StudentTask:
             f"Current: Tap {current_tap_position:.2f}, Voltages (min/max) ({min_street_voltage:.2f}, {max_street_voltage:.2f})V, \n \
                 {'safety limits' if use_safety_limits else 'hard limits'} applied - Limits ({lower_limit:.2f}, {upper_limit:.2f})V - delta (lower/upper) ({lower_safety - simulator.lower_voltage_band:.2f}, {simulator.upper_voltage_band - upper_safety:.2f})V"
         )
+        # Check for spreading
+        downshift_possible = True
+        upshift_possible = True
+        if spreading_control:
+            V_delta_upshift = calc_V_delta(current_tap_position, current_tap_position + 1)
+            if max_street_voltage + V_delta_upshift > upper_limit:
+                downshift_possible = False  
+            V_delta_downshift = calc_V_delta(current_tap_position, current_tap_position - 1)
+            if min_street_voltage - V_delta_downshift < lower_limit:
+                upshift_possible = False 
+
+        # Voltage too low
         if min_street_voltage < lower_limit:
-            if current_tap_position + 1 <= max_step:
+            if current_tap_position + 1 <= max_step & upshift_possible:
                 new_pos = eSteps.SWITCHHIGHER
                 logger.info(
                     f"Umin ({min_street_voltage:.2f}V) < lower band ({lower_limit:.2f}V). Switching higher. Tap {current_tap_position} -> {current_tap_position + 1}"
@@ -163,9 +181,13 @@ class StudentTask:
                 logger.info(
                     f"Umin ({min_street_voltage:.2f}V) < lower band ({lower_limit:.2f}V). Tap {current_tap_position} at max Tap ({max_step}).  Staying at Tap {current_tap_position}"
                 )
+            if spreading_control:
+                logger.info(
+                    f"V_delta = {V_delta_downshift:.2f}V"
+                )
             
         elif max_street_voltage > upper_limit:
-            if current_tap_position - 1 >= min_step:
+            if current_tap_position - 1 >= min_step & downshift_possible:
                 new_pos = eSteps.SWITCHLOWER
                 logger.info(
                     f"Umax ({max_street_voltage:.2f}V) > upper band ({upper_limit:.2f}V). Switching lower. Tap {current_tap_position} -> {current_tap_position - 1}"
@@ -175,12 +197,21 @@ class StudentTask:
                 logger.info(
                     f"Umax ({max_street_voltage:.2f}V) > upper band ({upper_limit:.2f}V). Tap {current_tap_position} at min Tap ({max_step}).  Staying at Tap {current_tap_position}"
                 )
+            if spreading_control:
+                logger.info(
+                    f"V_delta = {V_delta_upshift:.2f}V"
+                )
         else:
             new_pos = eSteps.STAY
             # range_control_factor -= 0.0
             # is_spreading = False
             logger.info(
                 f"Voltages within bands ({upper_limit:.2f}V - {upper_limit:.2f}V). Staying. Tap {current_tap_position}"
+            )
+        
+        if not upshift_possible or not downshift_possible:
+            logger.info(
+                f"Spreading detected -> Stay"
             )
 
         # ============================================
@@ -216,6 +247,17 @@ class StudentTask:
         # Start the FastAPI server
         logger.info(f"Starting FastAPI server on port {self.STUDENTTASK_PORT}")
         uvicorn.run(self.app, host="0.0.0.0", port=self.STUDENTTASK_PORT)
+
+
+def calc_V_delta(tap_current, tap_new, V_nominal=230):
+    tapposition_dict = {
+        2: 1.050,
+        1: 1.020,
+        0: 1.000,
+        -1: 0.980,
+        -2: 0.950}
+    V_delta = (tapposition_dict[tap_current] - tapposition_dict[tap_new]) * V_nominal
+    return V_delta
 
 
 def main() -> None:
