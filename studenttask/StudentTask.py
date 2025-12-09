@@ -1,6 +1,6 @@
 """
-Name: Max Mustermann
-Matriculation number: 123456
+Name: Michel Hadwiger
+Matriculation number: 11814638
 """
 
 import os
@@ -23,7 +23,7 @@ class StudentTask:
     # Constants for connection settings
     TIMEOUT_DURATION: float = 1.0
     STUDENTTASK_PORT: int = 7777
-    SIMULATOR_PORT: int = 3000
+    SIMULATOR_PORT: int = 8000
 
     def __init__(self) -> None:
         """
@@ -106,8 +106,7 @@ class StudentTask:
         """
 
         logger.info(
-            "Name: Mustermann \
-                    \nMatrNr: 123456"
+            "Name: Hadwiger, MatrNr: 11814638 \nAufgabe 1"
         )
 
         # Variables needed to return at end of algorithm
@@ -121,23 +120,52 @@ class StudentTask:
 
         # Getting the current tapposition, typecasting it to a float
         # and printing it out with a python f-string and two decimals
-        current_tap_position = float(simulator.get_current_tapchanger_position())
-        if current_tap_position == 0 and new_pos == eSteps.STAY:
-            logger.info(f"Current Tap: {current_tap_position:.2f}")
+        current_tap_position = int(simulator.get_current_tapchanger_position())
 
-        # Stupid logic for tapchanger
-        if current_tap_position == 0:
-            new_pos = eSteps.SWITCHHIGHER
-            range_control_factor -= 0.1
-            is_spreading = False
-        elif current_tap_position == 1 or current_tap_position == -1:
-            new_pos = eSteps.SWITCHLOWER
-            range_control_factor += 0.1
-            is_spreading = True
+        min_street_voltage = simulator.get_min_street_voltage()
+        max_street_voltage = simulator.get_max_street_voltage()
+        range_control_factor = simulator.get_range_control_factor()
+        # tapchanger_voltage_factor = simulator.get_tapchanger_voltage_factor()
+        upper_voltage_band = simulator.upper_voltage_band
+        lower_voltage_band = simulator.lower_voltage_band
+
+        min_step = simulator.min_step_position
+        max_step = simulator.max_step_position
+
+        logger.info(
+            f"Current Tap: {current_tap_position:.2f}, Umin = {min_street_voltage:.2f}V, Umax = {max_street_voltage:.2f}"
+        )
+        if min_street_voltage < lower_voltage_band:
+            if current_tap_position + 1 <= max_step:
+                new_pos = eSteps.SWITCHHIGHER
+                logger.info(
+                    f"Umin ({min_street_voltage:.2f}V) < lower band ({lower_voltage_band:.2f}V). Switching higher. Tap {current_tap_position} -> {current_tap_position + 1}"
+                )
+            else:
+                new_pos = eSteps.STAY
+                logger.info(
+                    f"Umin ({min_street_voltage:.2f}V) < lower band ({lower_voltage_band:.2f}V). Tap {current_tap_position} at max Tap ({max_step}).  Staying at Tap {current_tap_position}"
+                )
+            
+        elif max_street_voltage > upper_voltage_band:
+            if current_tap_position - 1 >= min_step:
+                new_pos = eSteps.SWITCHLOWER
+                logger.info(
+                    f"Umax ({max_street_voltage:.2f}V) > upper band ({upper_voltage_band:.2f}V). Switching lower. Tap {current_tap_position} -> {current_tap_position - 1}"
+                )
+            else:
+                new_pos = eSteps.STAY
+                logger.info(
+                    f"Umax ({max_street_voltage:.2f}V) > upper band ({upper_voltage_band:.2f}V). Tap {current_tap_position} at min Tap ({max_step}).  Staying at Tap {current_tap_position}"
+                )
         else:
             new_pos = eSteps.STAY
-            range_control_factor = 0.5
-            is_spreading = False
+            # range_control_factor -= 0.0
+            # is_spreading = False
+            logger.info(
+                f"Voltages within bands ({lower_voltage_band:.2f}V - {upper_voltage_band:.2f}V). Staying. Tap {current_tap_position}"
+            )
+
         # ============================================
 
         # Do NOT change this return.
