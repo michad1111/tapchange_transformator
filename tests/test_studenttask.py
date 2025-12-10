@@ -55,7 +55,8 @@ class TestStudentTask:
 
     # Task 1
     def test_upper_voltage_band_violation(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that tap changer steps down when voltage exceeds upper band"""
         mock_simulator_data.get_max_street_voltage = lambda: 245
         mock_simulator_data.task = 1
@@ -66,9 +67,9 @@ class TestStudentTask:
         assert result["spreading_detected"] == False
         assert result["range_control_factor"] == 1.0
 
-
     def test_lower_voltage_band_violation(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that tap changer steps up when voltage falls below lower band"""
         mock_simulator_data.get_min_street_voltage = lambda: 215
         mock_simulator_data.task = 1
@@ -80,7 +81,8 @@ class TestStudentTask:
         assert result["range_control_factor"] == 1.0
 
     def test_tapchanger_at_max_position(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that tap changer does not exceed max position when stepping up"""
         mock_simulator_data.get_min_street_voltage = lambda: 215
         mock_simulator_data.get_current_tapchanger_position = lambda: 2
@@ -90,10 +92,11 @@ class TestStudentTask:
 
         assert result["tapchanger_behavior"] == eSteps.STAY
         assert result["spreading_detected"] == False
-        assert result["range_control_factor"] == 1.0  
+        assert result["range_control_factor"] == 1.0
 
     def test_tapchanger_at_min_position(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that tap changer does not exceed min position when stepping down"""
         mock_simulator_data.get_max_street_voltage = lambda: 245
         mock_simulator_data.get_current_tapchanger_position = lambda: -2
@@ -105,9 +108,10 @@ class TestStudentTask:
         assert result["spreading_detected"] == False
         assert result["range_control_factor"] == 1.0
 
-    # Task 2  
+    # Task 2
     def test_upper_safety_violation(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that tap changer steps down when safety voltage is exceeded"""
         mock_simulator_data.get_max_street_voltage = lambda: 239
         mock_simulator_data.task = 2
@@ -119,7 +123,8 @@ class TestStudentTask:
         assert result["range_control_factor"] == 1.0
 
     def test_lower_safety_violation(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that tap changer steps down when safety voltage is exceeded"""
         mock_simulator_data.get_min_street_voltage = lambda: 221
         mock_simulator_data.task = 2
@@ -132,7 +137,8 @@ class TestStudentTask:
 
     # Task 3
     def test_spreading_detected(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that spreading is detected"""
         mock_simulator_data.get_min_street_voltage = lambda: 215
         mock_simulator_data.get_max_street_voltage = lambda: 238
@@ -146,7 +152,8 @@ class TestStudentTask:
 
     # Task 4
     def test_adjust_range_control_factor(
-            self, student_task: StudentTask, mock_simulator_data: Mock):
+        self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
         """Test that range control factor is adjusted when spreading is detected"""
         mock_simulator_data.get_min_street_voltage = lambda: 215
         mock_simulator_data.get_max_street_voltage = lambda: 238
