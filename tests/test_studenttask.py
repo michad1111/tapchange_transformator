@@ -150,6 +150,20 @@ class TestStudentTask:
         assert result["spreading_detected"] == True
         assert result["range_control_factor"] == 1.0
 
+    def test_no_spreading_detected(
+            self, student_task: StudentTask, mock_simulator_data: Mock
+    ):
+        """Test that no spreading is detected"""
+        mock_simulator_data.get_min_street_voltage = lambda: 235
+        mock_simulator_data.get_max_street_voltage = lambda: 239
+        mock_simulator_data.task = 3
+
+        result = student_task.calculate_control(mock_simulator_data)
+
+        assert result["tapchanger_behavior"] == eSteps.SWITCHLOWER
+        assert result["spreading_detected"] == False
+        assert result["range_control_factor"] == 1.0
+
     # Task 4
     def test_adjust_range_control_factor(
         self, student_task: StudentTask, mock_simulator_data: Mock
