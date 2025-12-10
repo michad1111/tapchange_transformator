@@ -34,3 +34,16 @@ services:
 
   # TODO: ADD STUDENTTASK SERVICE
 
+  studenttask:
+    build:
+      context: ./../studenttask
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_URL: 'http://backend:8000'
+      STUDENTTASK_URL: 'http://studenttask:7777'
+    ports:
+      - 7777:7777
+    depends_on:
+      backend:
+        condition: service_healthy
+

@@ -53,4 +53,4 @@ Dockerfile
 docker-compose.yml
 
 # Old dependency management
-requirements.txt
+# requirements.txt
