@@ -125,7 +125,7 @@ class StudentTask:
             "3": (True, True, False),
             "4": (True, True, True)
         }
-        use_safety_limits, spreading_control, range_control = settings_dict[task_nr]
+        use_safety_limits, spreading_control, range_control = settings_dict[str(task_nr)]
 
         # Get current values
         upper_hard = simulator.upper_voltage_band
