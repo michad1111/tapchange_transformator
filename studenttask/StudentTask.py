@@ -155,55 +155,54 @@ class StudentTask:
         logger.info(f"Safety limits: [{str(use_safety_limits)}] -> Limits: ({lower_limit:.2f}, {upper_limit:.2f})V")
         logger.info(f"Spreading control: [{str(spreading_control)}]")
 
-        logger.info(f"Current: U_(min/max)=({min_street_voltage:.2f}, {max_street_voltage:.2f})V @ Tap {current_tap_position}")
+        logger.info(f"Status: U_min = {min_street_voltage:.2f} V, U_max = {max_street_voltage:.2f} V @ Tap {current_tap_position}")
 
-        # Check for spreading
-        downshift_possible = True
-        upshift_possible = True
-        if spreading_control:
-            V_delta_upshift = calc_V_delta(current_tap_position, current_tap_position + 1)
-            if max_street_voltage + V_delta_upshift > upper_limit:
-                downshift_possible = False  
-            V_delta_downshift = calc_V_delta(current_tap_position, current_tap_position - 1)
-            if min_street_voltage - V_delta_downshift < lower_limit:
-                upshift_possible = False 
+        # Default for spreading detection
+        is_spreading = False
+        txt_V_delta = None
 
-    
-        txt_spreading = ""
         if min_street_voltage < lower_limit:
-            txt_limit = f"Lower Limit Violation: U_min ({min_street_voltage:.2f}V) < lower limit ({lower_limit:.2f}V). "
-            if (current_tap_position + 1 <= max_step) & upshift_possible:
+            txt_limit = f"Lower Limit Violation: U_min ({min_street_voltage:.2f}V) < lower limit ({lower_limit:.2f} V). "
+            if (current_tap_position + 1 <= max_step):
                 new_pos = eSteps.SWITCHHIGHER
-                txt_switch = f"Switching [HIGHER]. Tap {current_tap_position} -> {current_tap_position + 1}"
+                txt_switch = f"Switching [HIGHER]" #. Tap {current_tap_position} -> {current_tap_position + 1}"
             else:
                 new_pos = eSteps.STAY
-                txt_switch = f"Tap {current_tap_position} at max Tap ({max_step}). [STAY] at Tap {current_tap_position}"
+                txt_switch = f"Tap {current_tap_position} at max Tap ({max_step}). [STAY]" # at Tap {current_tap_position}"
             if spreading_control:
-                txt_spreading = f"V_delta = {V_delta_upshift:.2f}V"
+                V_delta = calc_V_delta(current_tap_position, current_tap_position + 1)
+                txt_V_delta = f"V_delta: {V_delta:.2f}V -> New max: {max_street_voltage - V_delta:.2f} V. "
+                if max_street_voltage - V_delta > upper_limit:
+                    is_spreading = True
             
         elif max_street_voltage > upper_limit:
             txt_limit = f"Upper Limit Violation: U_max ({max_street_voltage:.2f}V) > upper limit ({upper_limit:.2f}V). "
-            if (current_tap_position - 1 >= min_step) & downshift_possible:
+            if (current_tap_position - 1 >= min_step):
                 new_pos = eSteps.SWITCHLOWER
-                txt_switch = f"Switching [LOWER]. Tap {current_tap_position} -> {current_tap_position - 1}"
+                txt_switch = f"Switching [LOWER]" #. Tap {current_tap_position} -> {current_tap_position - 1}"
             else:
                 new_pos = eSteps.STAY
-                txt_switch = f"Tap {current_tap_position} at min Tap ({max_step}). [STAY] at Tap {current_tap_position}"
+                txt_switch = f"Tap {current_tap_position} at min Tap ({max_step}). [STAY]" # at Tap {current_tap_position}"
             if spreading_control:
-                txt_spreading = f"V_delta = {V_delta_downshift:.2f}V"
-
+                V_delta = calc_V_delta(current_tap_position, current_tap_position - 1)
+                txt_V_delta = f"V_delta: {V_delta:.2f}V -> New min: {min_street_voltage - V_delta:.2f}V. "
+                if min_street_voltage - V_delta < lower_limit:
+                    is_spreading = True
         else:
             new_pos = eSteps.STAY
             txt_limit = f"No Limit Violation. "
-            txt_switch = f"[STAY] at Tap {current_tap_position}."
+            txt_switch = f"[STAY]" # at Tap {current_tap_position}."
         
-        logger.info(txt_limit + txt_switch + txt_spreading)
-
-        if not upshift_possible or not downshift_possible:
-            logger.info(
-                f"Spreading detected -> [STAY] at Tap {current_tap_position}."
-            )
-
+        logger.info(txt_limit + txt_switch)
+        if spreading_control: 
+            if txt_V_delta is not None:
+                logger.info(txt_V_delta)
+            if is_spreading:
+                new_pos = eSteps.STAY
+                logger.info(f"Spreading detected -> [STAY] at Tap {current_tap_position}")
+            elif new_pos != eSteps.STAY:
+                logger.info(f"No Spreading detected -> Proceed with switch [{txt_switch.split('[')[1]} Tap {current_tap_position}->{current_tap_position + (1 if new_pos == eSteps.SWITCHHIGHER else -1)}")
+                
         # ============================================
 
         # Do NOT change this return.
@@ -241,12 +240,12 @@ class StudentTask:
 
 def calc_V_delta(tap_current, tap_new, V_nominal=230):
     tapposition_dict = {
-        2: 1.050,
-        1: 1.020,
-        0: 1.000,
-        -1: 0.980,
-        -2: 0.950}
-    V_delta = (tapposition_dict[tap_current] - tapposition_dict[tap_new]) * V_nominal
+        "2": 1.050,
+        "1": 1.020,
+        "0": 1.000,
+        "-1": 0.980,
+        "-2": 0.950}
+    V_delta = (tapposition_dict[str(tap_current)] - tapposition_dict[str(tap_new)]) * V_nominal
     return V_delta
 
 
