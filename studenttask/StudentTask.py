@@ -120,11 +120,12 @@ class StudentTask:
         task_nr = simulator.task
 
         settings_dict = {
-            "1": (False, False),
-            "2": (True, False),
-            "3": (True, True),
+            "1": (False, False, False),
+            "2": (True, False, False),
+            "3": (True, True, False),
+            "4": (True, True, True)
         }
-        use_safety_limits, spreading_control = settings_dict.get(task_nr, (False, False))
+        use_safety_limits, spreading_control, range_control = settings_dict[task_nr]
 
         # Get current values
         upper_hard = simulator.upper_voltage_band
@@ -140,8 +141,11 @@ class StudentTask:
         min_step = simulator.min_step_position
         max_step = simulator.max_step_position
 
-        range_control_factor = simulator.get_range_control_factor()
+        # Default
+        txt_V_delta = None 
         # tapchanger_voltage_factor = simulator.get_tapchanger_voltage_factor()
+        range_control_modifier = 0.1 # [V]
+        range_control_increase_buffer = 0.5 # [V]
 
         # Determine limits based on settings
         if use_safety_limits:
@@ -154,21 +158,18 @@ class StudentTask:
         logger.info(f"Aufgabe {task_nr}")
         logger.info(f"Safety limits: [{str(use_safety_limits)}] -> Limits: ({lower_limit:.2f}, {upper_limit:.2f})V")
         logger.info(f"Spreading control: [{str(spreading_control)}]")
+        logger.info(f"Range control: [{str(range_control)}]")
 
         logger.info(f"Status: U_min = {min_street_voltage:.2f} V, U_max = {max_street_voltage:.2f} V @ Tap {current_tap_position}")
-
-        # Default for spreading detection
-        is_spreading = False
-        txt_V_delta = None
 
         if min_street_voltage < lower_limit:
             txt_limit = f"Lower Limit Violation: U_min ({min_street_voltage:.2f}V) < lower limit ({lower_limit:.2f} V). "
             if (current_tap_position + 1 <= max_step):
                 new_pos = eSteps.SWITCHHIGHER
-                txt_switch = f"Switching [HIGHER]" #. Tap {current_tap_position} -> {current_tap_position + 1}"
+                txt_switch = f"Switching [HIGHER]"
             else:
                 new_pos = eSteps.STAY
-                txt_switch = f"Tap {current_tap_position} at max Tap ({max_step}). [STAY]" # at Tap {current_tap_position}"
+                txt_switch = f"Tap {current_tap_position} at max Tap ({max_step}). [STAY]"
             if spreading_control:
                 V_delta = calc_V_delta(current_tap_position, current_tap_position + 1)
                 txt_V_delta = f"V_delta: {V_delta:.2f}V -> New max: {max_street_voltage - V_delta:.2f} V. "
@@ -179,10 +180,10 @@ class StudentTask:
             txt_limit = f"Upper Limit Violation: U_max ({max_street_voltage:.2f}V) > upper limit ({upper_limit:.2f}V). "
             if (current_tap_position - 1 >= min_step):
                 new_pos = eSteps.SWITCHLOWER
-                txt_switch = f"Switching [LOWER]" #. Tap {current_tap_position} -> {current_tap_position - 1}"
+                txt_switch = f"Switching [LOWER]"
             else:
                 new_pos = eSteps.STAY
-                txt_switch = f"Tap {current_tap_position} at min Tap ({max_step}). [STAY]" # at Tap {current_tap_position}"
+                txt_switch = f"Tap {current_tap_position} at min Tap ({max_step}). [STAY]"
             if spreading_control:
                 V_delta = calc_V_delta(current_tap_position, current_tap_position - 1)
                 txt_V_delta = f"V_delta: {V_delta:.2f}V -> New min: {min_street_voltage - V_delta:.2f}V. "
@@ -191,7 +192,7 @@ class StudentTask:
         else:
             new_pos = eSteps.STAY
             txt_limit = f"No Limit Violation. "
-            txt_switch = f"[STAY]" # at Tap {current_tap_position}."
+            txt_switch = f"[STAY]"
         
         logger.info(txt_limit + txt_switch)
         if spreading_control: 
@@ -202,7 +203,27 @@ class StudentTask:
                 logger.info(f"Spreading detected -> [STAY] at Tap {current_tap_position}")
             elif new_pos != eSteps.STAY:
                 logger.info(f"No Spreading detected -> Proceed with switch [{txt_switch.split('[')[1]} Tap {current_tap_position}->{current_tap_position + (1 if new_pos == eSteps.SWITCHHIGHER else -1)}")
-                
+            
+            if range_control:
+                txt_change = ""
+                range_control_factor_new = range_control_factor # default
+                if is_spreading:
+                    range_control_factor_new = range_control_factor - range_control_modifier
+                    range_control_factor_new = max(0.0, range_control_factor_new)
+                elif new_pos == eSteps.SWITCHHIGHER:
+                    txt_change = "(no increase due to Tap [HIGHER])"
+                elif max_street_voltage > (upper_limit - range_control_increase_buffer):
+                    txt_change = f"(no increase due to insufficient buffer ({range_control_increase_buffer:.2f} V) to upper limit)"
+                else:
+                    range_control_factor_new = range_control_factor + range_control_modifier
+                    range_control_factor_new = min(1.0, range_control_factor_new)
+                    
+                if range_control_factor_new != range_control_factor:
+                    txt_change = f"(changed by {range_control_factor_new - range_control_factor:.1f})"
+                    range_control_factor = range_control_factor_new
+                logger.info(f"Range control factor: {range_control_factor:.1f}" + " " + txt_change)
+                    
+
         # ============================================
 
         # Do NOT change this return.
