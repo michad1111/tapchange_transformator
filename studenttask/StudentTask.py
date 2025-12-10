@@ -117,47 +117,46 @@ class StudentTask:
         # ============================================
         # TODO: WRITE YOUR OWN ALGORITHM HERE
         # This can be deleted befor you start programming
-        task_nr = 2
+        task_nr = simulator.task
 
-        logger.info(f"Aufgabe {task_nr}")
-        # Aufgabe 2: Warning Limits
-        if task_nr == 2:
-            use_safety_limits = True
-        else:
-            use_safety_limits = False
+        settings_dict = {
+            "1": (False, False),
+            "2": (True, False),
+            "3": (True, True),
+        }
+        use_safety_limits, spreading_control = settings_dict.get(task_nr, (False, False))
 
-        if task_nr == 3:
-            spreading_control = True
-            logger.info("Spreading control active")
-        else:
-            spreading_control = False
+        # Get current values
+        upper_hard = simulator.upper_voltage_band
+        lower_hard = simulator.lower_voltage_band
 
         upper_safety = simulator.upper_voltage_safety
         lower_safety = simulator.lower_voltage_safety
-        # TODO: make safety limits configurable
+
+        min_street_voltage = simulator.get_min_street_voltage()
+        max_street_voltage = simulator.get_max_street_voltage()
+
+        current_tap_position = int(simulator.get_current_tapchanger_position())
+        min_step = simulator.min_step_position
+        max_step = simulator.max_step_position
+
+        range_control_factor = simulator.get_range_control_factor()
+        # tapchanger_voltage_factor = simulator.get_tapchanger_voltage_factor()
+
+        # Determine limits based on settings
         if use_safety_limits:
             upper_limit = upper_safety
             lower_limit = lower_safety
         else:
-            upper_limit = simulator.upper_voltage_band
-            lower_limit = simulator.lower_voltage_band
+            upper_limit = upper_hard
+            lower_limit = lower_hard 
 
-        # Getting the current tapposition, typecasting it to a float
-        # and printing it out with a python f-string and two decimals
-        current_tap_position = int(simulator.get_current_tapchanger_position())
+        logger.info(f"Aufgabe {task_nr}")
+        logger.info(f"Safety limits: [{str(use_safety_limits)}] -> Limits: ({lower_limit:.2f}, {upper_limit:.2f})V")
+        logger.info(f"Spreading control: [{str(spreading_control)}]")
 
-        min_street_voltage = simulator.get_min_street_voltage()
-        max_street_voltage = simulator.get_max_street_voltage()
-        range_control_factor = simulator.get_range_control_factor()
-        # tapchanger_voltage_factor = simulator.get_tapchanger_voltage_factor()
+        logger.info(f"Current: U_(min/max)=({min_street_voltage:.2f}, {max_street_voltage:.2f})V @ Tap {current_tap_position}")
 
-        min_step = simulator.min_step_position
-        max_step = simulator.max_step_position
-
-        logger.info(
-            f"Current: Tap {current_tap_position:.2f}, Voltages (min/max) ({min_street_voltage:.2f}, {max_street_voltage:.2f})V, \n \
-                {'safety limits' if use_safety_limits else 'hard limits'} applied - Limits ({lower_limit:.2f}, {upper_limit:.2f})V - delta (lower/upper) ({lower_safety - simulator.lower_voltage_band:.2f}, {simulator.upper_voltage_band - upper_safety:.2f})V"
-        )
         # Check for spreading
         downshift_possible = True
         upshift_possible = True
@@ -169,58 +168,49 @@ class StudentTask:
             if min_street_voltage - V_delta_downshift < lower_limit:
                 upshift_possible = False 
 
-        # Voltage too low
+    
+        txt_spreading = ""
         if min_street_voltage < lower_limit:
-            if current_tap_position + 1 <= max_step & upshift_possible:
+            txt_limit = f"Lower Limit Violation: U_min ({min_street_voltage:.2f}V) < lower limit ({lower_limit:.2f}V). "
+            if (current_tap_position + 1 <= max_step) & upshift_possible:
                 new_pos = eSteps.SWITCHHIGHER
-                logger.info(
-                    f"Umin ({min_street_voltage:.2f}V) < lower band ({lower_limit:.2f}V). Switching higher. Tap {current_tap_position} -> {current_tap_position + 1}"
-                )
+                txt_switch = f"Switching [HIGHER]. Tap {current_tap_position} -> {current_tap_position + 1}"
             else:
                 new_pos = eSteps.STAY
-                logger.info(
-                    f"Umin ({min_street_voltage:.2f}V) < lower band ({lower_limit:.2f}V). Tap {current_tap_position} at max Tap ({max_step}).  Staying at Tap {current_tap_position}"
-                )
+                txt_switch = f"Tap {current_tap_position} at max Tap ({max_step}). [STAY] at Tap {current_tap_position}"
             if spreading_control:
-                logger.info(
-                    f"V_delta = {V_delta_downshift:.2f}V"
-                )
+                txt_spreading = f"V_delta = {V_delta_upshift:.2f}V"
             
         elif max_street_voltage > upper_limit:
-            if current_tap_position - 1 >= min_step & downshift_possible:
+            txt_limit = f"Upper Limit Violation: U_max ({max_street_voltage:.2f}V) > upper limit ({upper_limit:.2f}V). "
+            if (current_tap_position - 1 >= min_step) & downshift_possible:
                 new_pos = eSteps.SWITCHLOWER
-                logger.info(
-                    f"Umax ({max_street_voltage:.2f}V) > upper band ({upper_limit:.2f}V). Switching lower. Tap {current_tap_position} -> {current_tap_position - 1}"
-                )
+                txt_switch = f"Switching [LOWER]. Tap {current_tap_position} -> {current_tap_position - 1}"
             else:
                 new_pos = eSteps.STAY
-                logger.info(
-                    f"Umax ({max_street_voltage:.2f}V) > upper band ({upper_limit:.2f}V). Tap {current_tap_position} at min Tap ({max_step}).  Staying at Tap {current_tap_position}"
-                )
+                txt_switch = f"Tap {current_tap_position} at min Tap ({max_step}). [STAY] at Tap {current_tap_position}"
             if spreading_control:
-                logger.info(
-                    f"V_delta = {V_delta_upshift:.2f}V"
-                )
+                txt_spreading = f"V_delta = {V_delta_downshift:.2f}V"
+
         else:
             new_pos = eSteps.STAY
-            # range_control_factor -= 0.0
-            # is_spreading = False
-            logger.info(
-                f"Voltages within bands ({upper_limit:.2f}V - {upper_limit:.2f}V). Staying. Tap {current_tap_position}"
-            )
+            txt_limit = f"No Limit Violation. "
+            txt_switch = f"[STAY] at Tap {current_tap_position}."
         
+        logger.info(txt_limit + txt_switch + txt_spreading)
+
         if not upshift_possible or not downshift_possible:
             logger.info(
-                f"Spreading detected -> Stay"
+                f"Spreading detected -> [STAY] at Tap {current_tap_position}."
             )
 
         # ============================================
 
         # Do NOT change this return.
         # Only change the value of the variables themself
-        logger.info(
-            f"Final decisions - Position: {new_pos}, Spreading: {is_spreading}, Factor: {range_control_factor}"
-        )
+        # logger.info(
+        #     f"Final decisions - Position: {new_pos}, Spreading: {is_spreading}, Factor: {range_control_factor}"
+        # )
         return {
             "tapchanger_behavior": new_pos,
             "spreading_detected": is_spreading,
